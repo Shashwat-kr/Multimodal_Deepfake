@@ -10,7 +10,56 @@ document.addEventListener("DOMContentLoaded", () => {
   initEventStream();
   initNotes();
   initThemeToggle();
+  checkBackendHealth();
 });
+
+// === CHECK BACKEND HEALTH ===
+async function checkBackendHealth() {
+  try {
+    const res = await fetch(`${API_BASE_URL}/health`);
+    if (res.ok) {
+      const data = await res.json();
+      updateEventStream("✓ Backend online - Enhanced features loaded");
+      updateEventStream(`✓ Device: ${data.device}`);
+      if (data.features) {
+        updateEventStream(
+          `✓ Provenance: ${data.features.provenance_tracking ? "ON" : "OFF"}`
+        );
+        updateEventStream(
+          `✓ Deepfake AI: ${data.features.deepfake_detection ? "ON" : "OFF"}`
+        );
+        updateEventStream(
+          `✓ CoT Reasoning: ${data.features.cot_reasoning ? "ON" : "OFF"}`
+        );
+        updateEventStream(
+          `✓ Multilingual: ${data.features.multilingual ? "ON" : "OFF"}`
+        );
+      }
+    }
+  } catch (e) {
+    updateEventStream("⚠ Backend not responding");
+  }
+}
+
+function initEventStream() {
+  const stream = document.getElementById("eventStream");
+  if (stream) {
+    stream.innerHTML = "";
+  }
+}
+
+function updateEventStream(message) {
+  const stream = document.getElementById("eventStream");
+  if (!stream) return;
+  const div = document.createElement("div");
+  div.className = "mini-log-item";
+  div.textContent = message;
+  stream.appendChild(div);
+  // Keep only last 6 messages
+  while (stream.children.length > 6) {
+    stream.removeChild(stream.firstChild);
+  }
+}
 
 // === THEME TOGGLE ===
 function initThemeToggle() {
@@ -54,32 +103,16 @@ function drawLines() {
   resize();
 }
 
-// === EVENT STREAM ===
-function initEventStream() {
-  const stream = document.getElementById("eventStream");
-  if (!stream) return;
-  const events = [
-    "⏱ Models loaded (BERT, CLIP)",
-    "🔍 SerpAPI connectivity available",
-    "🧪 Sentiment & fake-news heads primed",
-    "📡 Multimodal pipeline ready",
-  ];
-  events.forEach((e) => {
-    const div = document.createElement("div");
-    div.className = "mini-log-item";
-    div.textContent = e;
-    stream.appendChild(div);
-  });
-}
-
 // === NOTES ===
 function initNotes() {
   const list = document.getElementById("noteList");
   if (!list) return;
   const notes = [
-    "Watch for extreme certainty alongside anonymous or vague sourcing.",
-    "Visual-text mismatch plus low domain trust is often more important than sentiment alone.",
-    "For election content, treat unverified viral clips as high-risk by default.",
+    "Provenance tracking detects when images are reused in different contexts (context hijacking).",
+    "Attention visualization shows which words the AI model focused on during analysis.",
+    "Chain-of-Thought reasoning provides step-by-step explanations for AI verdicts.",
+    "Deepfake detection uses neural networks trained on manipulated media datasets.",
+    "Multilingual support enables analysis of content in 100+ languages.",
   ];
   notes.forEach((t) => {
     const div = document.createElement("div");
@@ -96,9 +129,7 @@ function initUpload() {
   if (!uploadArea || !fileInput) return;
 
   uploadArea.addEventListener("click", () => fileInput.click());
-  uploadArea.addEventListener("dragover", (e) => {
-    e.preventDefault();
-  });
+  uploadArea.addEventListener("dragover", (e) => e.preventDefault());
   uploadArea.addEventListener("drop", (e) => {
     e.preventDefault();
     const file = e.dataTransfer.files[0];
@@ -117,13 +148,14 @@ function handleFileSelect(file) {
     "image/jpg",
     "text/plain",
     "application/pdf",
+    "video/mp4",
   ];
   if (file.type && !allowed.includes(file.type)) {
-    toast("Unsupported file type. Use JPG, PNG, TXT, or PDF.", "error");
+    toast("Unsupported file type. Use JPG, PNG, TXT, PDF, or MP4.", "error");
     return;
   }
-  if (file.size > 10 * 1024 * 1024) {
-    toast("File larger than 10MB is not allowed.", "error");
+  if (file.size > 50 * 1024 * 1024) {
+    toast("File larger than 50MB not allowed.", "error");
     return;
   }
   currentFile = file;
@@ -137,10 +169,8 @@ function showPreview(file) {
   const sizeEl = document.getElementById("fileSize");
   const imgEl = document.getElementById("previewImage");
 
-  upload.style.display = "block";
-  preview.classList.remove("hidden");
-
   upload.style.display = "none";
+  preview.classList.remove("hidden");
 
   nameEl.textContent = file.name;
   sizeEl.textContent = formatSize(file.size) + " • " + (file.type || "unknown");
@@ -154,13 +184,15 @@ function showPreview(file) {
       imgEl.appendChild(img);
     };
     reader.readAsDataURL(file);
+  } else if (file.type === "video/mp4") {
+    imgEl.innerHTML = `<i class="fas fa-film" style="color:#f97373;font-size:1.5rem;"></i>`;
   } else if (file.type === "application/pdf") {
     imgEl.innerHTML = `<i class="fas fa-file-pdf" style="color:#f97373;font-size:1.5rem;"></i>`;
   } else {
     imgEl.innerHTML = `<i class="fas fa-file-lines" style="color:#facc6b;font-size:1.5rem;"></i>`;
   }
 
-  toast("Media attached for cross‑modal analysis.", "info");
+  toast("Media ready for forensic analysis.", "info");
 }
 
 function removeFile() {
@@ -180,7 +212,7 @@ function formatSize(bytes) {
 // === ANALYSIS CALL ===
 async function analyzeContent() {
   if (!currentFile) {
-    toast("Attach at least one media/text file before running analysis.", "error");
+    toast("Attach media before running analysis.", "error");
     return;
   }
 
@@ -194,6 +226,8 @@ async function analyzeContent() {
   main.style.display = "none";
   loader.style.display = "inline-flex";
 
+  updateEventStream("🔬 Starting enhanced analysis...");
+
   try {
     const formData = new FormData();
     formData.append("file", currentFile);
@@ -204,16 +238,20 @@ async function analyzeContent() {
       method: "POST",
       body: formData,
     });
+
     if (!res.ok) {
       throw new Error("Backend error " + res.status);
     }
+
     const data = await res.json();
     analysisResults = data;
     renderAll(data);
-    toast("Analysis complete. Evidence chain updated.", "success");
+    toast("Analysis complete with AI reasoning!", "success");
+    updateEventStream("✓ Analysis complete");
   } catch (err) {
     console.error(err);
-    toast("Could not reach analysis server. Check backend.", "error");
+    toast("Analysis failed. Check backend connection.", "error");
+    updateEventStream("✗ Analysis failed");
   } finally {
     btn.disabled = false;
     main.style.display = "inline-flex";
@@ -227,6 +265,8 @@ function renderAll(data) {
   renderTextual(data.textual || {});
   renderVisual(data.visual || {});
   renderSource(data.source || {});
+  renderProvenance(data.provenance || {});
+  renderReasoning(data.reasoning || {});
   renderEvidence(data.evidence_chain || []);
 }
 
@@ -238,6 +278,7 @@ function renderOverview(data) {
   const textMini = document.getElementById("textRiskMini");
   const visualMini = document.getElementById("visualRiskMini");
   const sourceMini = document.getElementById("sourceRiskMini");
+  const provenanceMini = document.getElementById("provenanceRiskMini");
   const summaryEl = document.getElementById("narrativeSummary");
 
   animateNumber(riskEl, 0, score, 1800);
@@ -248,14 +289,13 @@ function renderOverview(data) {
     gauge.style.strokeDashoffset = offset;
   }, 80);
 
-  let verdictText = data.verdict || "LOW RISK";
-  verdictBadge.textContent = verdictText;
+  verdictBadge.textContent = data.verdict || "LOW RISK";
   verdictBadge.className = "badge badge-soft";
 
-  if (score >= 70) {
+  if (score >= 65) {
     verdictBadge.style.borderColor = "rgba(249,115,115,0.9)";
     verdictBadge.style.color = "#fecaca";
-  } else if (score >= 40) {
+  } else if (score >= 35) {
     verdictBadge.style.borderColor = "rgba(250,204,21,0.9)";
     verdictBadge.style.color = "#facc15";
   } else {
@@ -266,18 +306,16 @@ function renderOverview(data) {
   const textRisk = 100 - (data.textual?.credibility_score || 0);
   const visualRisk = data.visual?.deepfake_score || 0;
   const sourceRisk = 100 - (data.source?.trust_score || 0);
-  textMini.textContent = isNaN(textRisk) ? "–" : textRisk.toFixed(1) + "%";
+  const provenanceRisk = data.provenance?.risk_score || 0;
+
+  textMini.textContent = textRisk.toFixed(1) + "%";
   visualMini.textContent = visualRisk.toFixed(1) + "%";
-  sourceMini.textContent = isNaN(sourceRisk) ? "–" : sourceRisk.toFixed(1) + "%";
+  sourceMini.textContent = sourceRisk.toFixed(1) + "%";
+  provenanceMini.textContent = provenanceRisk.toFixed(1) + "%";
 
-  const narrative =
-    score >= 70
-      ? "Signals suggest a high‑risk case. Language, visuals, and sourcing should be scrutinized manually before amplification."
-      : score >= 40
-      ? "Signals are mixed. Some modalities raise concerns, but corroborating evidence exists. Treat with caution."
-      : "Most modalities agree with authentic patterns. Low‑risk, though critical claims still warrant human judgment.";
-  summaryEl.textContent = narrative;
+  summaryEl.textContent = data.recommendation || "Analysis in progress...";
 
+  // Timeline
   const timeline = document.getElementById("timelineSteps");
   timeline.innerHTML = "";
   (data.evidence_chain || []).forEach((ev) => {
@@ -285,16 +323,19 @@ function renderOverview(data) {
     step.className = "timeline-step";
     const fill = document.createElement("div");
     fill.className = "timeline-step-fill";
-    fill.style.background =
-      ev.type === "textual"
-        ? "linear-gradient(90deg,#facc6b,#f97316)"
-        : ev.type === "visual"
-        ? "linear-gradient(90deg,#f97373,#f97316)"
-        : "linear-gradient(90deg,#22c55e,#16a34a)";
+
+    const colors = {
+      textual: "linear-gradient(90deg,#facc6b,#f97316)",
+      visual: "linear-gradient(90deg,#f97373,#ef4444)",
+      source: "linear-gradient(90deg,#22c55e,#16a34a)",
+      provenance: "linear-gradient(90deg,#60a5fa,#3b82f6)",
+    };
+    fill.style.background = colors[ev.type] || colors.textual;
+
     step.appendChild(fill);
     timeline.appendChild(step);
     requestAnimationFrame(() => {
-      fill.style.transform = "scaleX(" + Math.min(ev.weight * 1.3, 1) + ")";
+      fill.style.transform = "scaleX(" + Math.min(ev.weight * 1.5, 1) + ")";
     });
   });
 }
@@ -302,64 +343,91 @@ function renderOverview(data) {
 function renderTextual(t) {
   const cred = t.credibility_score || 0;
   const sens = t.sensationalism_index || 0;
-  const bias = (t.political_bias || 0) * 100;
-  const sent = (t.sentiment_score || 0) * 100;
 
   updateBar("credibilityBar", "credibilityScore", cred, "%");
-  updateBar("sensationalismBar", "sensationalismScore", sens * 10, "/10", sens.toFixed(1));
-  updateBar("biasBar", "biasScore", bias, "%");
-  updateBar("sentimentBar", "sentimentScore", sent, "%");
+  updateBar(
+    "sensationalismBar",
+    "sensationalismScore",
+    sens * 10,
+    "/10",
+    sens.toFixed(1)
+  );
 
+  // Language badge
+  const langBadge = document.getElementById("languageBadge");
+  const lang = t.language_detected || "en";
+  langBadge.textContent = `${getLangName(lang)} (${lang})`;
+
+  // Attention highlights
+  const attentionWords = document.getElementById("attentionWords");
+  attentionWords.innerHTML = "";
+
+  const highlights = t.attention_highlights || [];
+  if (highlights.length > 0) {
+    highlights.slice(0, 8).forEach(([word, score]) => {
+      const span = document.createElement("span");
+      span.className = "attention-word";
+      span.textContent = `${word} (${(score * 100).toFixed(0)}%)`;
+      span.style.opacity = 0.4 + score * 0.6;
+      attentionWords.appendChild(span);
+    });
+  }
+
+  // Highlighted phrases in text
   const snippetEl = document.getElementById("highlightedText");
   const ctx = document.getElementById("textContext").value || "";
-  if (!ctx) {
-    snippetEl.textContent =
-      "Once you provide text, the model will highlight emotionally loaded segments and all‑or‑nothing claims.";
-    return;
+  const keywords = t.highlighted_phrases || ["breaking", "shocking", "urgent"];
+
+  if (ctx) {
+    let snippet = ctx.slice(0, 260);
+    keywords.forEach((k) => {
+      const reg = new RegExp("\\b" + k + "\\b", "gi");
+      snippet = snippet.replace(reg, (m) => `<mark>${m}</mark>`);
+    });
+    snippetEl.innerHTML = snippet + (ctx.length > 260 ? "…" : "");
   }
-  const keywords = ["guaranteed", "never", "always", "shocking", "breaking", "exposed"];
-  let snippet = ctx.slice(0, 260);
-  keywords.forEach((k) => {
-    const reg = new RegExp("\\b" + k + "\\b", "gi");
-    snippet = snippet.replace(reg, (m) => `<mark>${m}</mark>`);
-  });
-  snippetEl.innerHTML = snippet + (ctx.length > 260 ? "…" : "");
 }
 
 function renderVisual(v) {
-  const deep = v.deepfake_score || 0;
-  const conf = (v.confidence || 0) * 100;
-  const verdict = v.verdict || "N/A";
+  // Handle both old and new data structures
+  const deep = v.deepfake_score || v.deepfake?.probability || 0;
+  const conf = v.confidence || (v.deepfake?.confidence || 0);
+  const verdict = v.verdict || v.deepfake?.verdict || "N/A";
+  const artifacts = v.artifacts || v.deepfake?.artifacts || [];
 
   const deepEl = document.getElementById("deepfakeScore");
   const confEl = document.getElementById("confidenceScore");
   const verEl = document.getElementById("consistencyVerdict");
   const ring = document.getElementById("deepfakeRing");
 
-  deepEl.textContent = deep.toFixed(1) + "%";
-  confEl.textContent = conf.toFixed(0) + "%";
-  verEl.textContent = verdict;
+  if (deepEl) deepEl.textContent = deep.toFixed(1) + "%";
+  if (confEl) confEl.textContent = (conf * 100).toFixed(0) + "%";
+  if (verEl) verEl.textContent = verdict;
 
-  if (deep >= 70) {
-    ring.style.boxShadow = "0 0 30px rgba(249,115,115,0.7)";
-  } else if (deep >= 40) {
-    ring.style.boxShadow = "0 0 22px rgba(250,204,21,0.7)";
-  } else {
-    ring.style.boxShadow = "0 0 22px rgba(34,197,94,0.55)";
+  if (ring) {
+    if (deep >= 70) {
+      ring.style.boxShadow = "0 0 30px rgba(249,115,115,0.7)";
+    } else if (deep >= 40) {
+      ring.style.boxShadow = "0 0 22px rgba(250,204,21,0.7)";
+    } else {
+      ring.style.boxShadow = "0 0 22px rgba(34,197,94,0.55)";
+    }
   }
 
-  const artifacts = v.artifacts || [];
   const list = document.getElementById("artifactsList");
-  list.innerHTML = "";
-  if (!artifacts.length) {
-    list.innerHTML = `<span class="artifact-tag">No obvious artifacts surfaced by the model.</span>`;
-  } else {
-    artifacts.forEach((a) => {
-      const span = document.createElement("span");
-      span.className = "artifact-tag";
-      span.textContent = a;
-      list.appendChild(span);
-    });
+  if (list) {
+    list.innerHTML = "";
+    
+    if (!artifacts || artifacts.length === 0) {
+      list.innerHTML = `<span class="artifact-tag">No manipulation artifacts detected.</span>`;
+    } else {
+      artifacts.forEach((a) => {
+        const span = document.createElement("span");
+        span.className = "artifact-tag";
+        span.textContent = a;
+        list.appendChild(span);
+      });
+    }
   }
 }
 
@@ -370,11 +438,13 @@ function renderSource(s) {
   const cont = document.getElementById("sourcesContainer");
   cont.innerHTML = "";
   const links = s.links || [];
+
   if (!links.length) {
     cont.innerHTML =
-      '<div class="sources-empty">No corroborating sources found for this snippet.</div>';
+      '<div class="sources-empty">No corroborating sources found.</div>';
     return;
   }
+
   links.forEach((lnk) => {
     const item = document.createElement("a");
     item.href = lnk.url;
@@ -385,38 +455,114 @@ function renderSource(s) {
     const icon = document.createElement("div");
     icon.className = "source-icon";
     const i = document.createElement("i");
-    i.className = lnk.is_trusted ? "fas fa-check-circle trusted" : "fas fa-circle untrusted";
+    i.className = lnk.is_trusted
+      ? "fas fa-check-circle trusted"
+      : "fas fa-circle untrusted";
     icon.appendChild(i);
 
     const main = document.createElement("div");
     main.className = "source-main";
     const title = document.createElement("div");
     title.className = "source-title";
-    title.textContent = lnk.title || "Untitled source";
+    title.textContent = lnk.title || "Untitled";
     const url = document.createElement("div");
     url.className = "source-url";
     url.textContent = lnk.url;
 
     main.appendChild(title);
     main.appendChild(url);
-
     item.appendChild(icon);
     item.appendChild(main);
     cont.appendChild(item);
   });
 }
 
+function renderProvenance(p) {
+  const container = document.getElementById("provenanceTimeline");
+  container.innerHTML = "";
+
+  const timeline = p.timeline || [];
+
+  if (!timeline.length) {
+    container.innerHTML =
+      '<div style="text-align: center; color: var(--text-muted); font-size: 0.85rem;">No provenance data available for this media.</div>';
+    return;
+  }
+
+  // Context hijacking alert
+  if (p.context_hijacking_detected) {
+    const alert = document.createElement("div");
+    alert.className = "context-hijack-alert";
+    alert.innerHTML = `
+      <strong>⚠ Context Hijacking Detected!</strong><br/>
+      This image has appeared in ${
+        p.context_changes?.length || 0
+      } different contexts across the web.
+    `;
+    container.appendChild(alert);
+  }
+
+  // Timeline items
+  timeline.slice(0, 5).forEach((item) => {
+    const div = document.createElement("div");
+    div.className = "timeline-item";
+    div.innerHTML = `
+      <div class="timeline-date">${item.date || "Unknown"}</div>
+      <div class="timeline-content">
+        <div class="timeline-title">${item.context || "No context"}</div>
+        <div class="timeline-source">
+          ${item.source || "Unknown source"} 
+          ${
+            item.url
+              ? `• <a href="${item.url}" target="_blank" style="color: var(--primary);">View</a>`
+              : ""
+          }
+        </div>
+      </div>
+    `;
+    container.appendChild(div);
+  });
+
+  if (timeline.length > 5) {
+    const more = document.createElement("div");
+    more.style.cssText =
+      "text-align: center; color: var(--text-muted); margin-top: 0.5rem; font-size: 0.8rem;";
+    more.textContent = `+ ${timeline.length - 5} more appearances`;
+    container.appendChild(more);
+  }
+}
+
+function renderReasoning(r) {
+  const box = document.getElementById("reasoningBox");
+  const text = document.getElementById("reasoningText");
+
+  const reasoning = r.explanation || "No reasoning available.";
+  const confidence = (r.confidence || 0.75) * 100;
+  const method =
+    r.method === "llm-cot" ? "LLM Chain-of-Thought" : "Rule-based Logic";
+
+  text.innerHTML = `
+    <div style="margin-bottom: 0.5rem; font-size: 0.75rem; color: var(--text-muted);">
+      Method: ${method} • Confidence: ${confidence.toFixed(0)}%
+    </div>
+    ${reasoning}
+  `;
+}
+
 function renderEvidence(chain) {
   const container = document.getElementById("evidenceChain");
   container.innerHTML = "";
+
   if (!chain.length) {
     container.innerHTML =
-      '<div class="note">Evidence weights will appear here after the first analysis.</div>';
+      '<div class="note">Evidence weights will appear after analysis.</div>';
     return;
   }
+
   chain.forEach((ev) => {
     const card = document.createElement("div");
     card.className = "evidence-card";
+
     const top = document.createElement("div");
     top.className = "evidence-top";
     const type = document.createElement("div");
@@ -473,12 +619,27 @@ function animateNumber(el, start, end, duration) {
   }, stepTime);
 }
 
+function getLangName(code) {
+  const names = {
+    en: "English",
+    hi: "Hindi",
+    es: "Spanish",
+    fr: "French",
+    ar: "Arabic",
+    zh: "Chinese",
+    de: "German",
+    pt: "Portuguese",
+  };
+  return names[code] || "Unknown";
+}
+
 let toastTimer;
 function toast(msg, type = "info") {
   const t = document.getElementById("toast");
   const msgEl = document.getElementById("toastMessage");
   const icon = t.querySelector("i");
   msgEl.textContent = msg;
+
   if (type === "success") {
     icon.className = "fas fa-circle-check";
     t.style.borderColor = "rgba(34,197,94,0.85)";
@@ -489,6 +650,7 @@ function toast(msg, type = "info") {
     icon.className = "fas fa-circle-info";
     t.style.borderColor = "rgba(250,204,21,0.9)";
   }
+
   t.classList.add("show");
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => {
