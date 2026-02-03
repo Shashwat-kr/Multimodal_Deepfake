@@ -1,5 +1,5 @@
 // CONFIG
-const API_BASE_URL = "http://localhost:5001/api";
+const API_BASE_URL = "http://localhost:5001";
 
 let currentFile = null;
 let analysisResults = null;
@@ -23,13 +23,13 @@ async function checkBackendHealth() {
       updateEventStream(`✓ Device: ${data.device}`);
       if (data.features) {
         updateEventStream(
-          `✓ Provenance: ${data.features.provenance_tracking ? "ON" : "OFF"}`
+          `✓ Provenance: ${data.features.provenance ? "ON" : "OFF"}`
         );
         updateEventStream(
-          `✓ Deepfake AI: ${data.features.deepfake_detection ? "ON" : "OFF"}`
+          `✓ Deepfake AI: ${data.features.deepfake ? "ON" : "OFF"}`
         );
         updateEventStream(
-          `✓ CoT Reasoning: ${data.features.cot_reasoning ? "ON" : "OFF"}`
+          `✓ CoT Reasoning: ${data.features.cot ? "ON" : "OFF"}`
         );
         updateEventStream(
           `✓ Multilingual: ${data.features.multilingual ? "ON" : "OFF"}`
@@ -231,7 +231,7 @@ async function analyzeContent() {
   try {
     const formData = new FormData();
     formData.append("file", currentFile);
-    formData.append("text_context", text || "No text");
+    formData.append("text", text || "No text");
     formData.append("language", lang);
 
     const res = await fetch(`${API_BASE_URL}/analyze`, {
@@ -341,52 +341,59 @@ function renderOverview(data) {
 }
 
 function renderTextual(t) {
-  const cred = t.credibility_score || 0;
-  const sens = t.sensationalism_index || 0;
+    const cred = t.credibility_score || 0;
+    const sens = t.sensationalism_index || 0;
 
-  updateBar("credibilityBar", "credibilityScore", cred, "%");
-  updateBar(
-    "sensationalismBar",
-    "sensationalismScore",
-    sens * 10,
-    "/10",
-    sens.toFixed(1)
-  );
+    updateBar("credibilityBar", "credibilityScore", cred, "%");
+    updateBar(
+        "sensationalismBar",
+        "sensationalismScore",
+        sens * 10,
+        "/10",
+        sens.toFixed(1)
+    );
 
-  // Language badge
-  const langBadge = document.getElementById("languageBadge");
-  const lang = t.language_detected || "en";
-  langBadge.textContent = `${getLangName(lang)} (${lang})`;
+    // Language badge
+    const langBadge = document.getElementById("languageBadge");
+    const lang = t.language_detected || "en";
+    langBadge.textContent = `${getLangName(lang)} (${lang})`;
 
-  // Attention highlights
-  const attentionWords = document.getElementById("attentionWords");
-  attentionWords.innerHTML = "";
+    // Attention highlights - FIXED
+    const attentionWords = document.getElementById("attentionWords");
+    attentionWords.innerHTML = "";
+    const highlights = t.attention_highlights || [];
+    
+    if (highlights.length > 0) {
+        highlights.slice(0, 8).forEach((item) => {
+            // Handle both object {word, score} and array [word, score] formats
+            const word = item.word || item[0] || "";
+            const score = item.score || item[1] || 0;
+            
+            if (word) {
+                const span = document.createElement("span");
+                span.className = "attention-word";
+                span.textContent = `${word} (${(score * 100).toFixed(0)}%)`;
+                span.style.opacity = 0.4 + score * 0.6;
+                attentionWords.appendChild(span);
+            }
+        });
+    }
 
-  const highlights = t.attention_highlights || [];
-  if (highlights.length > 0) {
-    highlights.slice(0, 8).forEach(([word, score]) => {
-      const span = document.createElement("span");
-      span.className = "attention-word";
-      span.textContent = `${word} (${(score * 100).toFixed(0)}%)`;
-      span.style.opacity = 0.4 + score * 0.6;
-      attentionWords.appendChild(span);
-    });
-  }
-
-  // Highlighted phrases in text
-  const snippetEl = document.getElementById("highlightedText");
-  const ctx = document.getElementById("textContext").value || "";
-  const keywords = t.highlighted_phrases || ["breaking", "shocking", "urgent"];
-
-  if (ctx) {
-    let snippet = ctx.slice(0, 260);
-    keywords.forEach((k) => {
-      const reg = new RegExp("\\b" + k + "\\b", "gi");
-      snippet = snippet.replace(reg, (m) => `<mark>${m}</mark>`);
-    });
-    snippetEl.innerHTML = snippet + (ctx.length > 260 ? "…" : "");
-  }
+    // Highlighted phrases in text
+    const snippetEl = document.getElementById("highlightedText");
+    const ctx = document.getElementById("textContext").value || "";
+    const keywords = t.highlighted_phrases || ["breaking", "shocking", "urgent"];
+    
+    if (ctx) {
+        let snippet = ctx.slice(0, 260);
+        keywords.forEach((k) => {
+            const reg = new RegExp("\\b" + k + "\\b", "gi");
+            snippet = snippet.replace(reg, (m) => `<mark>${m}</mark>`);
+        });
+        snippetEl.innerHTML = snippet + (ctx.length > 260 ? "…" : "");
+    }
 }
+
 
 function renderVisual(v) {
   // Handle both old and new data structures
