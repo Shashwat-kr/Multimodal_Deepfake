@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>MediaShield Enhanced - Intelligence Hub</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+  />
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    /* Additional styles for new features */
+    .provenance-timeline {
+      margin-top: 1rem;
+      padding: 0.8rem;
+      background: rgba(10, 10, 14, 0.98);
+      border-radius: 12px;
+      border: 1px solid rgba(120, 113, 108, 0.7);
+    }
+    
+    .timeline-item {
+      display: flex;
+      gap: 0.75rem;
+      padding: 0.5rem;
+      border-left: 2px solid var(--primary);
+      margin-bottom: 0.5rem;
+      position: relative;
+    }
+    
+    .timeline-item::before {
+      content: '';
+      position: absolute;
+      left: -6px;
+      top: 0.5rem;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--primary);
+    }
+    
+    .timeline-date {
+      min-width: 80px;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+    
+    .timeline-content {
+      flex: 1;
+    }
+    
+    .timeline-title {
+      font-size: 0.85rem;
+      font-weight: 500;
+      margin-bottom: 0.2rem;
+    }
+    
+    .timeline-source {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+    
+    .context-hijack-alert {
+      padding: 0.5rem;
+      background: rgba(249, 115, 115, 0.1);
+      border: 1px solid rgba(249, 115, 115, 0.5);
+      border-radius: 8px;
+      margin-top: 0.5rem;
+      font-size: 0.8rem;
+    }
+    
+    .attention-word {
+      display: inline-block;
+      padding: 0.15rem 0.4rem;
+      margin: 0.2rem;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      background: rgba(249, 115, 22, 0.2);
+      border: 1px solid rgba(249, 115, 22, 0.5);
+    }
+    
+    .reasoning-box {
+      padding: 0.8rem;
+      background: rgba(10, 10, 14, 0.98);
+      border-radius: 12px;
+      border: 1px dashed rgba(120, 113, 108, 0.7);
+      margin-top: 0.75rem;
+    }
+    
+    .reasoning-title {
+      font-size: 0.8rem;
+      color: var(--primary);
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+    }
+    
+    .reasoning-text {
+      font-size: 0.85rem;
+      line-height: 1.6;
+      color: var(--text-soft);
+    }
+    
+    .language-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.2rem 0.5rem;
+      border-radius: 999px;
+      background: rgba(34, 197, 94, 0.18);
+      color: var(--success);
+      font-size: 0.7rem;
+      gap: 0.25rem;
+    }
+  </style>
+</head>
+<body>
+  <!-- GLOBAL BACKGROUND -->
+  <div class="bg-net">
+    <div class="bg-grid"></div>
+    <canvas id="bgLines"></canvas>
+  </div>
+
+  <!-- TOP NAVBAR -->
+  <header class="topbar">
+    <div class="topbar-left">
+      <div class="brand">
+        <span class="brand-icon">
+          <i class="fas fa-shield-virus"></i>
+        </span>
+        <div>
+          <div class="brand-title">MediaShield Enhanced</div>
+          <div class="brand-subtitle">Advanced Multimodal Forensics</div>
+        </div>
+      </div>
+    </div>
+    <div class="topbar-center">
+      <div class="top-kpis">
+        <div class="kpi-card">
+          <span class="kpi-label">Sessions Today</span>
+          <span class="kpi-value" id="kpiSessions">124</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">High-Risk Flags</span>
+          <span class="kpi-value danger" id="kpiHighRisk">32</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">Avg. Risk Score</span>
+          <span class="kpi-value warning" id="kpiAvgScore">54%</span>
+        </div>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <div class="mode-toggle">
+        <i class="fas fa-moon"></i>
+      </div>
+      <div class="user-pill">
+        <span class="user-avatar">J</span>
+        <span class="user-label">Journalist mode</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN LAYOUT -->
+  <div class="layout">
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <div class="sidebar-section">
+        <div class="sidebar-title">Workspace</div>
+        <button class="sidebar-item active">
+          <i class="fas fa-square-poll-horizontal"></i>
+          <span>Live Analysis</span>
+        </button>
+        <button class="sidebar-item">
+          <i class="fas fa-database"></i>
+          <span>Case Archive</span>
+        </button>
+        <button class="sidebar-item">
+          <i class="fas fa-robot"></i>
+          <span>Model Insights</span>
+        </button>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-title">Enhanced Features</div>
+        <button class="chip chip-active">
+          <i class="fas fa-clock-rotate-left"></i> Provenance
+        </button>
+        <button class="chip chip-active">
+          <i class="fas fa-brain"></i> CoT Reasoning
+        </button>
+        <button class="chip chip-active">
+          <i class="fas fa-robot"></i> Deepfake AI
+        </button>
+        <button class="chip chip-active">
+          <i class="fas fa-eye"></i> Attention
+        </button>
+        <button class="chip chip-active">
+          <i class="fas fa-language"></i> Multilingual
+        </button>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-title">Risk Filters</div>
+        <label class="filter-row">
+          <span>Only high-risk</span>
+          <input type="checkbox" checked />
+        </label>
+        <label class="filter-row">
+          <span>Context hijacking</span>
+          <input type="checkbox" checked />
+        </label>
+        <label class="filter-row">
+          <span>Deepfakes only</span>
+          <input type="checkbox" />
+        </label>
+      </div>
+
+      <div class="sidebar-footer">
+        <div class="mini-log">
+          <div class="mini-log-title">Event Stream</div>
+          <div class="mini-log-list" id="eventStream"></div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="main">
+      <!-- TOP ROW: INPUT + GLOBAL RISK -->
+      <section class="row row-top">
+        <!-- LEFT: INPUT HUB -->
+        <div class="card card-input">
+          <div class="card-header">
+            <div>
+              <div class="card-title">
+                <i class="fas fa-microscope"></i> Submit Evidence
+              </div>
+              <div class="card-subtitle">
+                Paste text, attach media - AI will trace provenance & check authenticity.
+              </div>
+            </div>
+            <div class="badge badge-live">
+              <span class="pulse-dot"></span> All models online
+            </div>
+          </div>
+
+          <!-- MODE TABS -->
+          <div class="input-tabs">
+            <button class="input-tab active" data-mode="news">
+              <i class="fas fa-newspaper"></i> News Article
+            </button>
+            <button class="input-tab" data-mode="social">
+              <i class="fab fa-x-twitter"></i> Social Post
+            </button>
+            <button class="input-tab" data-mode="video">
+              <i class="fas fa-video"></i> Short Video
+            </button>
+          </div>
+
+          <!-- INPUT GRID -->
+          <div class="input-grid">
+            <!-- TEXT COLUMN -->
+            <div class="input-col">
+              <label class="field-label">
+                Text context
+                <span class="field-hint">Headline / caption / excerpt</span>
+              </label>
+              <textarea
+                id="textContext"
+                class="field-textarea"
+                rows="7"
+                placeholder="Example: Viral video claims that a political leader announced an immediate nationwide shutdown..."
+              ></textarea>
+
+              <div class="field-inline">
+                <div>
+                  <label class="field-label">Language</label>
+                  <select id="languageSelect" class="field-select">
+                    <option value="en">English (en)</option>
+                    <option value="hi">Hindi (hi)</option>
+                    <option value="es">Spanish (es)</option>
+                    <option value="fr">French (fr)</option>
+                    <option value="ar">Arabic (ar)</option>
+                    <option value="zh">Chinese (zh)</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="field-label">Sensitivity profile</label>
+                  <select id="profileSelect" class="field-select">
+                    <option value="journalist">Investigative journalist</option>
+                    <option value="platform">Social platform trust & safety</option>
+                    <option value="enterprise">Enterprise risk team</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- MEDIA COLUMN -->
+            <div class="input-col">
+              <label class="field-label">
+                Media attachment
+                <span class="field-hint">Image / video / document (JPG, PNG, MP4, PDF)</span>
+              </label>
+
+              <div id="uploadArea" class="dropzone">
+                <div class="dropzone-inner">
+                  <div class="dropzone-icon">
+                    <i class="fas fa-cloud-arrow-up"></i>
+                  </div>
+                  <div class="dropzone-text-main">
+                    Drop media here or <span class="link">browse</span>
+                  </div>
+                  <div class="dropzone-text-sub">
+                    AI will trace media history & check for manipulation.
+                  </div>
+                  <input
+                    id="fileInput"
+                    type="file"
+                    hidden
+                    accept=".jpg,.jpeg,.png,.txt,.pdf,.mp4"
+                  />
+                </div>
+              </div>
+
+              <div id="filePreview" class="file-preview hidden">
+                <div class="file-preview-left" id="previewImage"></div>
+                <div class="file-preview-right">
+                  <div class="file-name" id="fileName">sample.png</div>
+                  <div class="file-meta" id="fileSize">1.2 MB • image/png</div>
+                  <div class="file-badges">
+                    <span class="file-badge">Multimodal aligned</span>
+                    <span class="file-badge badge-soft">Provenance ready</span>
+                  </div>
+                  <button class="btn-ghost" onclick="removeFile()">
+                    <i class="fas fa-times"></i> Remove
+                  </button>
+                </div>
+              </div>
+
+              <button id="analyzeBtn" class="btn-primary-wide" onclick="analyzeContent()">
+                <span class="btn-main">
+                  <i class="fas fa-play"></i>
+                  Run full forensics suite
+                </span>
+                <span class="btn-loader">
+                  <span class="spinner"></span>
+                  <span>Analyzing...</span>
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- RIGHT: GLOBAL RISK & TIMELINE -->
+        <div class="card card-risk" id="overviewCard">
+          <div class="card-header">
+            <div>
+              <div class="card-title">
+                <i class="fas fa-gauge-high"></i> Case Overview
+              </div>
+              <div class="card-subtitle">
+                AI-powered multimodal confidence synthesis.
+              </div>
+            </div>
+            <div class="badge badge-soft" id="verdictBadge">Awaiting input</div>
+          </div>
+
+          <div class="risk-gauge-row">
+            <div class="gauge-shell">
+              <svg viewBox="0 0 200 120" class="gauge-svg">
+                <defs>
+                  <linearGradient id="gaugeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stop-color="#22c55e" />
+                    <stop offset="50%" stop-color="#facc6b" />
+                    <stop offset="100%" stop-color="#f97373" />
+                  </linearGradient>
+                </defs>
+                <path
+                  d="M 20 100 A 80 80 0 0 1 180 100"
+                  fill="none"
+                  stroke="#020617"
+                  stroke-width="18"
+                  stroke-linecap="round"
+                />
+                <path
+                  id="gaugeProgress"
+                  d="M 20 100 A 80 80 0 0 1 180 100"
+                  fill="none"
+                  stroke="url(#gaugeGradient)"
+                  stroke-width="18"
+                  stroke-linecap="round"
+                  stroke-dasharray="251.2"
+                  stroke-dashoffset="251.2"
+                />
+              </svg>
+              <div class="gauge-center">
+                <div class="gauge-value">
+                  <span id="riskScore">0</span><span class="unit">%</span>
+                </div>
+                <div class="gauge-label">Misinformation risk</div>
+              </div>
+            </div>
+            <div class="risk-meta">
+              <div class="risk-pill">
+                <span class="risk-label">Text risk</span>
+                <span class="risk-score" id="textRiskMini">—</span>
+              </div>
+              <div class="risk-pill">
+                <span class="risk-label">Visual risk</span>
+                <span class="risk-score" id="visualRiskMini">—</span>
+              </div>
+              <div class="risk-pill">
+                <span class="risk-label">Source risk</span>
+                <span class="risk-score" id="sourceRiskMini">—</span>
+              </div>
+              <div class="risk-pill">
+                <span class="risk-label">Provenance risk</span>
+                <span class="risk-score" id="provenanceRiskMini">—</span>
+              </div>
+              <div class="timeline">
+                <div class="timeline-title">Evidence chain</div>
+                <div class="timeline-steps" id="timelineSteps"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="insight-row" id="narrativeSummary">
+            Ingest text and media to generate forensic narrative with AI reasoning.
+          </div>
+        </div>
+      </section>
+
+      <!-- MIDDLE ROW: 3 MODAL PANELS -->
+      <section class="row row-middle">
+        <!-- TEXT ANALYSIS -->
+        <div class="card card-panel">
+          <div class="card-header">
+            <div class="card-title">
+              <i class="fas fa-align-left"></i> Text Forensics
+            </div>
+            <div class="tag tag-soft" id="languageBadge">Multilingual</div>
+          </div>
+
+          <div class="panel-body">
+            <div class="metric-row">
+              <div class="metric-block">
+                <div class="metric-label">Credibility score</div>
+                <div class="metric-bar">
+                  <div id="credibilityBar" class="metric-fill"></div>
+                  <span id="credibilityScore" class="metric-value">—</span>
+                </div>
+              </div>
+              <div class="metric-block">
+                <div class="metric-label">Sensationalism index</div>
+                <div class="metric-bar">
+                  <div id="sensationalismBar" class="metric-fill warning"></div>
+                  <span id="sensationalismScore" class="metric-value">—</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="snippet-box">
+              <div class="snippet-title">
+                <i class="fas fa-eye"></i> Attention-weighted highlights
+              </div>
+              <div class="snippet-text" id="highlightedText">
+                AI will highlight sensational phrases using attention weights.
+              </div>
+              <div id="attentionWords" style="margin-top: 0.5rem;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- VISUAL / DEEPFAKE ANALYSIS -->
+        <div class="card card-panel">
+          <div class="card-header">
+            <div class="card-title">
+              <i class="fas fa-robot"></i> Deepfake Detection
+            </div>
+            <div class="tag tag-soft">Neural analysis</div>
+          </div>
+
+          <div class="panel-body visual-panel">
+            <div class="deepfake-widget">
+              <div class="deepfake-ring" id="deepfakeRing">
+                <div class="deepfake-core">
+                  <span id="deepfakeScore">—</span>
+                  <span class="core-label">AI-generated probability</span>
+                </div>
+              </div>
+              <div class="deepfake-meta">
+                <div class="meta-row">
+                  <span class="meta-label">Model confidence</span>
+                  <span id="confidenceScore" class="meta-value">—</span>
+                </div>
+                <div class="meta-row">
+                  <span class="meta-label">CLIP verdict</span>
+                  <span id="consistencyVerdict" class="meta-value">N/A</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="artifact-section">
+              <div class="artifact-header">
+                <span>Detected artifacts</span>
+                <span class="tag tag-soft">AI analysis</span>
+              </div>
+              <div id="artifactsList" class="artifact-tags">
+                <span class="artifact-tag">Awaiting analysis</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SOURCE VERIFICATION -->
+        <div class="card card-panel">
+          <div class="card-header">
+            <div class="card-title">
+              <i class="fas fa-globe"></i> Source Verification
+            </div>
+            <div class="tag tag-soft">External corroboration</div>
+          </div>
+
+          <div class="panel-body">
+            <div class="metric-block">
+              <div class="metric-label">Source trust score</div>
+              <div class="metric-bar">
+                <div id="trustBar" class="metric-fill"></div>
+                <span id="trustScore" class="metric-value">—</span>
+              </div>
+            </div>
+
+            <div class="sources-list">
+              <div class="sources-header">
+                <span>Corroborating links</span>
+                <span class="sources-sub">Trusted outlets highlighted.</span>
+              </div>
+              <div id="sourcesContainer" class="sources-container">
+                <div class="sources-empty">
+                  Run analysis to see corroborating sources.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- NEW: PROVENANCE & REASONING ROW -->
+      <section class="row row-middle">
+        <!-- PROVENANCE TIMELINE -->
+        <div class="card card-wide" style="grid-column: 1 / 3;">
+          <div class="card-header">
+            <div class="card-title">
+              <i class="fas fa-clock-rotate-left"></i> Media Provenance Timeline
+            </div>
+            <div class="tag tag-soft">Context hijacking detection</div>
+          </div>
+          <div style="padding: 0.8rem 1rem 1rem;">
+            <div id="provenanceTimeline" class="provenance-timeline">
+              <div style="text-align: center; color: var(--text-muted); font-size: 0.85rem;">
+                Upload an image to trace its history across the web.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- CHAIN-OF-THOUGHT REASONING -->
+        <div class="card card-panel">
+          <div class="card-header">
+            <div class="card-title">
+              <i class="fas fa-brain"></i> AI Reasoning
+            </div>
+            <div class="tag tag-soft">Chain-of-Thought</div>
+          </div>
+          <div class="panel-body">
+            <div class="reasoning-box" id="reasoningBox">
+              <div class="reasoning-title">
+                <i class="fas fa-lightbulb"></i>
+                Explainable verdict
+              </div>
+              <div class="reasoning-text" id="reasoningText">
+                AI will provide step-by-step reasoning for its verdict once analysis completes.
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- BOTTOM ROW: EVIDENCE + INSIGHTS -->
+      <section class="row row-bottom">
+        <!-- EVIDENCE CHAIN -->
+        <div class="card card-wide">
+          <div class="card-header">
+            <div class="card-title">
+              <i class="fas fa-link"></i> Evidence Chain Contribution
+            </div>
+            <div class="tag tag-soft">Weighted synthesis</div>
+          </div>
+          <div id="evidenceChain" class="evidence-grid"></div>
+        </div>
+
+        <!-- INSIGHTS FEED -->
+        <div class="card card-narrative">
+          <div class="card-header">
+            <div class="card-title">
+              <i class="fas fa-list-ul"></i> Analyst Notes
+            </div>
+            <div class="tag tag-soft">Best practices</div>
+          </div>
+          <div class="narrative-body">
+            <div class="note" id="notePrimary">
+              MediaShield now includes: temporal provenance tracking, real deepfake detection, 
+              Chain-of-Thought reasoning, attention visualization, and multilingual support.
+            </div>
+            <div class="note-list" id="noteList"></div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- TOAST -->
+  <div id="toast" class="toast">
+    <i class="fas fa-circle-info"></i>
+    <span id="toastMessage">Status</span>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
