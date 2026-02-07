@@ -1,0 +1,8 @@
+{
+  "text_features_shape": "torch.Size([4, 768])",
+  "image_vit_shape": "torch.Size([3, 768])",
+  "image_cnn_shape": "torch.Size([3, 1024])",
+  "audio_wav2vec_shape": "torch.Size([1, 768])",
+  "total_feature_dim": 3328,
+  "device": "mps"
+}

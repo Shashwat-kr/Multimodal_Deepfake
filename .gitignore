@@ -1,0 +1,10 @@
+__pycache__/
+cache/
+logs/
+.env
+.DS_Store
+*.pt
+*.pth
+*.ckpt
+reports/
+uploads/
