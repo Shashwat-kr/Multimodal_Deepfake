@@ -54,20 +54,6 @@ A production-ready, AI-powered deepfake detection system that requires **no trai
 
 ---
 
-## 📊 Test Results (Verified)
-
-| Test Case | Input | Fake Probability | Verdict | Status |
-|-----------|-------|------------------|---------|--------|
-| Fake News | "BREAKING: Shocking miracle cure!" | 65.7% | UNCERTAIN | ✅ |
-| Extreme Clickbait | "Doctors hate him! 100% guaranteed!" | 63.6% | UNCERTAIN | ✅ |
-| AI Image | Gemini-generated image | 59.0% | UNCERTAIN | ✅ |
-| Multimodal | Fake text + AI image | 46.5% | UNCERTAIN | ✅ |
-| Academic Text | Scientific abstract | 48.8% | UNCERTAIN | ✅ |
-
-**Error Handling Verified**: System gracefully handles agent failures without crashing. ✅
-
----
-
 ## 🚀 Quick Start
 
 ### Prerequisites
