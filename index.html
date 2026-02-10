@@ -532,12 +532,29 @@
 
             <div class="sources-list">
               <div class="sources-header">
-                <span>Corroborating links</span>
+                <span>Corroborating links & Reverse Image Search</span>
                 <span class="sources-sub">Trusted outlets highlighted.</span>
               </div>
+              
+              <!-- Reverse Image Search Control -->
+              <div style="margin-bottom: 1rem; padding: 0.8rem; background: rgba(10,10,14,0.5); border-radius: 8px;">
+                <div style="margin-bottom: 0.5rem;">
+                  <label style="font-size: 0.85rem; color: var(--text-muted);">
+                    <i class="fas fa-key"></i> SerpAPI Key (for reverse image search)
+                  </label>
+                  <input type="password" id="serpapiKeyInput" placeholder="Enter SerpAPI key or set in environment" 
+                    style="width: 100%; padding: 0.5rem; margin-top: 0.3rem; border: 1px solid rgba(120,113,108,0.5); border-radius: 6px; background: rgba(0,0,0,0.3); color: var(--text);" />
+                </div>
+                <button id="reverseImageSearchBtn" 
+                  style="width: 100%; padding: 0.6rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none; border-radius: 6px; color: white; font-weight: 500; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; justify-content: center;">
+                  <i class="fas fa-image"></i> Reverse Image Search
+                </button>
+                <div id="reverseSearchStatus" style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.3rem; text-align: center;"></div>
+              </div>
+              
               <div id="sourcesContainer" class="sources-container">
                 <div class="sources-empty">
-                  Run analysis to see corroborating sources.
+                  Run analysis to see corroborating sources. Use reverse image search for uploaded images.
                 </div>
               </div>
             </div>

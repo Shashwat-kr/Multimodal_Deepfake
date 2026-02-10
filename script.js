@@ -11,6 +11,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initNotes();
   initThemeToggle();
   checkBackendHealth();
+  initReverseImageSearch();
 });
 
 // === CHECK BACKEND HEALTH ===
@@ -59,6 +60,130 @@ function updateEventStream(message) {
   while (stream.children.length > 6) {
     stream.removeChild(stream.firstChild);
   }
+}
+
+// === REVERSE IMAGE SEARCH ===
+function initReverseImageSearch() {
+  const btn = document.getElementById("reverseImageSearchBtn");
+  if (!btn) return;
+  
+  btn.addEventListener("click", performReverseImageSearch);
+}
+
+async function performReverseImageSearch() {
+  if (!currentFile) {
+    toast("Please upload an image first", "error");
+    return;
+  }
+  
+  if (!currentFile.type.startsWith('image')) {
+    toast("Please upload an image file for reverse search", "error");
+    return;
+  }
+  
+  const btn = document.getElementById("reverseImageSearchBtn");
+  const status = document.getElementById("reverseSearchStatus");
+  const serpapi_key = document.getElementById("serpapiKeyInput").value.trim();
+  
+  btn.disabled = true;
+  status.textContent = "⏳ Searching...";
+  status.style.color = "var(--text-muted)";
+  
+  try {
+    const formData = new FormData();
+    formData.append("image", currentFile);
+    if (serpapi_key) {
+      formData.append("serpapi_key", serpapi_key);
+    }
+    
+    const res = await fetch(`${API_BASE_URL}/api/reverse-image-search`, {
+      method: "POST",
+      body: formData
+    });
+    
+    const data = await res.json();
+    
+    if (!res.ok) {
+      status.textContent = "❌ Error: " + (data.message || data.error);
+      status.style.color = "#ff7b7b";
+      toast(data.message || "Reverse image search failed", "error");
+      return;
+    }
+    
+    if (data.sources && data.sources.length > 0) {
+      renderReverseImageResults(data.sources);
+      status.textContent = "✓ Found " + data.sources.length + " sources";
+      status.style.color = "#86efac";
+      toast("Found " + data.sources.length + " sources for this image", "success");
+    } else {
+      status.textContent = "No sources found. Try again or check your API key.";
+      status.style.color = "#facc15";
+    }
+  } catch (err) {
+    console.error(err);
+    status.textContent = "❌ Search failed";
+    status.style.color = "#ff7b7b";
+    toast("Reverse image search failed. Check backend.", "error");
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function renderReverseImageResults(sources) {
+  const container = document.getElementById("sourcesContainer");
+  container.innerHTML = "";
+  
+  sources.forEach((source, idx) => {
+    const item = document.createElement("div");
+    item.className = "source-item";
+    item.style.cssText = `
+      padding: 0.8rem;
+      background: rgba(10,10,14,0.6);
+      border: 1px solid rgba(102,126,234,0.3);
+      border-radius: 8px;
+      margin-bottom: 0.6rem;
+      transition: all 0.2s;
+    `;
+    
+    item.onmouseover = function() { this.style.borderColor = "rgba(102,126,234,0.7)"; };
+    item.onmouseout = function() { this.style.borderColor = "rgba(102,126,234,0.3)"; };
+    
+    const title = source.title || source.source_website || "Unknown Source";
+    const link = source.link || "#";
+    const snippet = source.snippet ? source.snippet.substring(0, 100) + "..." : "";
+    
+    item.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: start; gap: 0.5rem;">
+        <div style="flex: 1;">
+          <a href="${escapeHtml(link)}" target="_blank" rel="noopener" style="color: #667eea; text-decoration: none; font-weight: 500; font-size: 0.9rem;">
+            ${escapeHtml(title)}
+          </a>
+          <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.2rem; word-break: break-all;">
+            ${escapeHtml(link)}
+          </div>
+          ${snippet ? '<div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.3rem;">' + escapeHtml(snippet) + '</div>' : ""}
+        </div>
+        <button onclick="copyToClipboard('${link.replace(/'/g, "\\'")}')" style="padding: 0.3rem 0.6rem; background: rgba(102,126,234,0.2); border: 1px solid rgba(102,126,234,0.5); border-radius: 4px; color: #667eea; font-size: 0.7rem; cursor: pointer;">
+          Copy
+        </button>
+      </div>
+    `;
+    
+    container.appendChild(item);
+  });
+}
+
+function escapeHtml(text) {
+  const map = {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'};
+  return String(text).replace(/[&<>"']/g, function(m) { return map[m]; });
+}
+
+function copyToClipboard(text) {
+  navigator.clipboard.writeText(text).then(function() {
+    toast("Link copied!", "success");
+  }).catch(function() {
+    toast("Failed to copy", "error");
+  });
 }
 
 // === THEME TOGGLE ===

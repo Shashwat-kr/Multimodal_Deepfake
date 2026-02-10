@@ -1,6 +1,11 @@
 
 import torch
+import os
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 class Config:
     """Configuration for Multimodal Deepfake Detection System"""
@@ -45,6 +50,10 @@ class Config:
     # Batch Processing
     BATCH_SIZE = 8
     NUM_WORKERS = 4
+
+    # API Keys for Source Verification
+    SERPAPI_KEY = os.getenv("SERPAPI_KEY", "")
+    IMGBB_API_KEY = os.getenv("IMGBB_API_KEY", "")
 
     # Create directories
     @classmethod

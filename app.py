@@ -12,6 +12,7 @@ import os
 import sys
 from pathlib import Path
 import traceback
+import requests
 
 # Add project root to path
 PROJECT_ROOT = Path(__file__).resolve().parents[0]
@@ -277,6 +278,191 @@ def detect_image_only():
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/reverse-image-search', methods=['POST'])
+def reverse_image_search():
+    """
+    Reverse image search using SerpAPI to find sources.
+    Uploads image to ImgBB first to get URL, then uses SerpAPI.
+    """
+    try:
+        from config import Config
+        import traceback
+        
+        if 'image' not in request.files:
+            return jsonify({'error': 'No image file provided'}), 400
+        
+        image_file = request.files['image']
+        serpapi_key = request.form.get('serpapi_key') or Config.SERPAPI_KEY
+        imgbb_key = Config.IMGBB_API_KEY
+        
+        if not serpapi_key:
+            return jsonify({
+                'error': 'SerpAPI key not provided',
+                'sources': [],
+                'message': 'Please enter your SerpAPI key or set SERPAPI_KEY environment variable'
+            }), 400
+        
+        # Save image temporarily
+        filename = secure_filename(image_file.filename)
+        image_path = os.path.join(app.config['UPLOAD_FOLDER'], f'temp_{filename}')
+        
+        try:
+            image_file.save(image_path)
+        except Exception as e:
+            print(f"Error saving image: {e}")
+            return jsonify({
+                'error': 'Failed to save image',
+                'sources': [],
+                'message': str(e)
+            }), 500
+        
+        try:
+            # Step 1: Upload to ImgBB to get a public URL
+            image_url = None
+            if imgbb_key:
+                print(f"[Reverse Search] Uploading image to ImgBB...")
+                with open(image_path, 'rb') as f:
+                    files = {'image': f}
+                    try:
+                        imgbb_response = requests.post(
+                            'https://api.imgbb.com/1/upload',
+                            params={'key': imgbb_key},
+                            files=files,
+                            timeout=30
+                        )
+                        if imgbb_response.status_code == 200:
+                            imgbb_data = imgbb_response.json()
+                            if imgbb_data.get('success'):
+                                # Access the correct path in the response
+                                image_url = imgbb_data.get('data', {}).get('url')
+                                if image_url:
+                                    print(f"[Reverse Search] ✓ Image uploaded: {image_url[:60]}...")
+                                else:
+                                    print(f"[Reverse Search] ✗ No URL in response: {imgbb_data.get('data', {})}")
+                            else:
+                                print(f"[Reverse Search] ✗ ImgBB error: {imgbb_data.get('error', {})}")
+                        else:
+                            print(f"[Reverse Search] ✗ ImgBB failed ({imgbb_response.status_code}): {imgbb_response.text[:200]}")
+                    except requests.exceptions.Timeout:
+                        print(f"[Reverse Search] ✗ ImgBB upload timeout")
+                    except requests.exceptions.RequestException as e:
+                        print(f"[Reverse Search] ✗ ImgBB error: {str(e)}")
+            
+            if not image_url:
+                print(f"[Reverse Search] ✗ Could not get image URL from ImgBB")
+                return jsonify({
+                    'error': 'Failed to upload image',
+                    'message': 'Could not upload to image hosting service. Please check your IMGBB_API_KEY.',
+                    'sources': []
+                }), 500
+            
+            # Step 2: Use SerpAPI with the image URL
+            from serpapi import GoogleSearch
+            
+            print(f"[Reverse Search] Searching via SerpAPI with URL...")
+            
+            # Try google_lens first (better for images)
+            params = {
+                "engine": "google_lens",
+                "url": image_url,
+                "api_key": serpapi_key
+            }
+            
+            search = GoogleSearch(params)
+            
+            try:
+                results_dict = search.get_dict()
+            except Exception as e:
+                print(f"[Reverse Search] ✗ Error parsing SerpAPI response: {str(e)}")
+                return jsonify({
+                    'error': 'Invalid API response',
+                    'message': 'SerpAPI returned invalid data. Check your API key or try again.',
+                    'sources': []
+                }), 500
+            
+            print(f"[Reverse Search] Response keys: {list(results_dict.keys())}")
+            
+            # Extract relevant results from various possible response formats
+            sources = []
+            
+            # Try to get results from different possible keys
+            visual_matches = results_dict.get('visual_matches', [])
+            if visual_matches:
+                print(f"[Reverse Search] Found {len(visual_matches)} visual matches")
+                for result in visual_matches[:10]:
+                    source_item = {
+                        'title': result.get('title', '') or result.get('source', ''),
+                        'link': result.get('link', '') or result.get('url', ''),
+                        'source_website': result.get('source', 'Web'),
+                        'snippet': result.get('snippet', '') or result.get('description', ''),
+                        'thumbnail': result.get('thumbnail', '')
+                    }
+                    if source_item['link']:
+                        sources.append(source_item)
+            
+            # Fallback to organic results
+            if not sources:
+                organic_results = results_dict.get('organic_results', [])
+                if organic_results:
+                    print(f"[Reverse Search] Fallback to {len(organic_results)} organic results")
+                    for result in organic_results[:8]:
+                        source_item = {
+                            'title': result.get('title', ''),
+                            'link': result.get('link', ''),
+                            'source_website': result.get('source', '').split('/')[0] or 'Web',
+                            'snippet': result.get('snippet', ''),
+                            'thumbnail': ''
+                        }
+                        if source_item['link']:
+                            sources.append(source_item)
+            
+            print(f"[Reverse Search] ✓ Extracted {len(sources)} sources")
+            
+            return jsonify({
+                'status': 'success',
+                'sources': sources,
+                'total_results': len(sources),
+                'message': f'Found {len(sources)} sources for this image',
+                'image_url': image_url
+            }), 200
+            
+        except ImportError as e:
+            error_msg = "SerpAPI library not installed. Run: pip install google-search-results"
+            print(f"ImportError: {error_msg}")
+            return jsonify({
+                'error': 'SerpAPI not installed',
+                'message': error_msg,
+                'sources': [],
+                'details': str(e)
+            }), 500
+        except Exception as e:
+            print(f"SerpAPI Error: {str(e)}")
+            traceback.print_exc()
+            return jsonify({
+                'error': 'Search failed',
+                'message': 'Failed to perform reverse image search',
+                'sources': [],
+                'details': str(e)
+            }), 500
+        finally:
+            # Cleanup
+            if os.path.exists(image_path):
+                try:
+                    os.remove(image_path)
+                except:
+                    pass
+    
+    except Exception as e:
+        print(f"Endpoint Error: {str(e)}")
+        traceback.print_exc()
+        return jsonify({
+            'error': 'Server error',
+            'message': str(e),
+            'sources': []
+        }), 500
+
+
 
 @app.route('/analyze', methods=['POST'])
 def analyze_frontend():
