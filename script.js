@@ -24,16 +24,16 @@ async function checkBackendHealth() {
       updateEventStream(`✓ Device: ${data.device}`);
       if (data.features) {
         updateEventStream(
-          `✓ Provenance: ${data.features.provenance ? "ON" : "OFF"}`
+          `✓ Provenance: ${data.features.provenance ? "ON" : "OFF"}`,
         );
         updateEventStream(
-          `✓ Deepfake AI: ${data.features.deepfake ? "ON" : "OFF"}`
+          `✓ Deepfake AI: ${data.features.deepfake ? "ON" : "OFF"}`,
         );
         updateEventStream(
-          `✓ CoT Reasoning: ${data.features.cot ? "ON" : "OFF"}`
+          `✓ CoT Reasoning: ${data.features.cot ? "ON" : "OFF"}`,
         );
         updateEventStream(
-          `✓ Multilingual: ${data.features.multilingual ? "ON" : "OFF"}`
+          `✓ Multilingual: ${data.features.multilingual ? "ON" : "OFF"}`,
         );
       }
     }
@@ -66,7 +66,7 @@ function updateEventStream(message) {
 function initReverseImageSearch() {
   const btn = document.getElementById("reverseImageSearchBtn");
   if (!btn) return;
-  
+
   btn.addEventListener("click", performReverseImageSearch);
 }
 
@@ -75,46 +75,49 @@ async function performReverseImageSearch() {
     toast("Please upload an image first", "error");
     return;
   }
-  
-  if (!currentFile.type.startsWith('image')) {
+
+  if (!currentFile.type.startsWith("image")) {
     toast("Please upload an image file for reverse search", "error");
     return;
   }
-  
+
   const btn = document.getElementById("reverseImageSearchBtn");
   const status = document.getElementById("reverseSearchStatus");
   const serpapi_key = document.getElementById("serpapiKeyInput").value.trim();
-  
+
   btn.disabled = true;
   status.textContent = "⏳ Searching...";
   status.style.color = "var(--text-muted)";
-  
+
   try {
     const formData = new FormData();
     formData.append("image", currentFile);
     if (serpapi_key) {
       formData.append("serpapi_key", serpapi_key);
     }
-    
+
     const res = await fetch(`${API_BASE_URL}/api/reverse-image-search`, {
       method: "POST",
-      body: formData
+      body: formData,
     });
-    
+
     const data = await res.json();
-    
+
     if (!res.ok) {
       status.textContent = "❌ Error: " + (data.message || data.error);
       status.style.color = "#ff7b7b";
       toast(data.message || "Reverse image search failed", "error");
       return;
     }
-    
+
     if (data.sources && data.sources.length > 0) {
       renderReverseImageResults(data.sources);
       status.textContent = "✓ Found " + data.sources.length + " sources";
       status.style.color = "#86efac";
-      toast("Found " + data.sources.length + " sources for this image", "success");
+      toast(
+        "Found " + data.sources.length + " sources for this image",
+        "success",
+      );
     } else {
       status.textContent = "No sources found. Try again or check your API key.";
       status.style.color = "#facc15";
@@ -132,7 +135,7 @@ async function performReverseImageSearch() {
 function renderReverseImageResults(sources) {
   const container = document.getElementById("sourcesContainer");
   container.innerHTML = "";
-  
+
   sources.forEach((source, idx) => {
     const item = document.createElement("div");
     item.className = "source-item";
@@ -144,14 +147,20 @@ function renderReverseImageResults(sources) {
       margin-bottom: 0.6rem;
       transition: all 0.2s;
     `;
-    
-    item.onmouseover = function() { this.style.borderColor = "rgba(102,126,234,0.7)"; };
-    item.onmouseout = function() { this.style.borderColor = "rgba(102,126,234,0.3)"; };
-    
+
+    item.onmouseover = function () {
+      this.style.borderColor = "rgba(102,126,234,0.7)";
+    };
+    item.onmouseout = function () {
+      this.style.borderColor = "rgba(102,126,234,0.3)";
+    };
+
     const title = source.title || source.source_website || "Unknown Source";
     const link = source.link || "#";
-    const snippet = source.snippet ? source.snippet.substring(0, 100) + "..." : "";
-    
+    const snippet = source.snippet
+      ? source.snippet.substring(0, 100) + "..."
+      : "";
+
     item.innerHTML = `
       <div style="display: flex; justify-content: space-between; align-items: start; gap: 0.5rem;">
         <div style="flex: 1;">
@@ -161,29 +170,40 @@ function renderReverseImageResults(sources) {
           <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.2rem; word-break: break-all;">
             ${escapeHtml(link)}
           </div>
-          ${snippet ? '<div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.3rem;">' + escapeHtml(snippet) + '</div>' : ""}
+          ${snippet ? '<div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.3rem;">' + escapeHtml(snippet) + "</div>" : ""}
         </div>
         <button onclick="copyToClipboard('${link.replace(/'/g, "\\'")}')" style="padding: 0.3rem 0.6rem; background: rgba(102,126,234,0.2); border: 1px solid rgba(102,126,234,0.5); border-radius: 4px; color: #667eea; font-size: 0.7rem; cursor: pointer;">
           Copy
         </button>
       </div>
     `;
-    
+
     container.appendChild(item);
   });
 }
 
 function escapeHtml(text) {
-  const map = {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'};
-  return String(text).replace(/[&<>"']/g, function(m) { return map[m]; });
+  const map = {
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#039;",
+  };
+  return String(text).replace(/[&<>"']/g, function (m) {
+    return map[m];
+  });
 }
 
 function copyToClipboard(text) {
-  navigator.clipboard.writeText(text).then(function() {
-    toast("Link copied!", "success");
-  }).catch(function() {
-    toast("Failed to copy", "error");
-  });
+  navigator.clipboard
+    .writeText(text)
+    .then(function () {
+      toast("Link copied!", "success");
+    })
+    .catch(function () {
+      toast("Failed to copy", "error");
+    });
 }
 
 // === THEME TOGGLE ===
@@ -429,7 +449,7 @@ function renderOverview(data) {
   }
 
   const textRisk = 100 - (data.textual?.credibility_score || 0);
-  const visualRisk = data.visual?.deepfake_score || 0;
+  const visualRisk = data.visual?.misinformation_score ?? 0;
   const sourceRisk = 100 - (data.source?.trust_score || 0);
   const provenanceRisk = data.provenance?.risk_score || 0;
 
@@ -466,64 +486,67 @@ function renderOverview(data) {
 }
 
 function renderTextual(t) {
-    const cred = t.credibility_score || 0;
-    const sens = t.sensationalism_index || 0;
+  const cred = t.credibility_score || 0;
+  const sens = t.sensationalism_index || 0;
 
-    updateBar("credibilityBar", "credibilityScore", cred, "%");
-    updateBar(
-        "sensationalismBar",
-        "sensationalismScore",
-        sens * 10,
-        "/10",
-        sens.toFixed(1)
-    );
+  updateBar("credibilityBar", "credibilityScore", cred, "%");
+  updateBar(
+    "sensationalismBar",
+    "sensationalismScore",
+    sens * 10,
+    "/10",
+    sens.toFixed(1),
+  );
 
-    // Language badge
-    const langBadge = document.getElementById("languageBadge");
-    const lang = t.language_detected || "en";
-    langBadge.textContent = `${getLangName(lang)} (${lang})`;
+  // Language badge
+  const langBadge = document.getElementById("languageBadge");
+  const lang = t.language_detected || "en";
+  langBadge.textContent = `${getLangName(lang)} (${lang})`;
 
-    // Attention highlights - FIXED
-    const attentionWords = document.getElementById("attentionWords");
-    attentionWords.innerHTML = "";
-    const highlights = t.attention_highlights || [];
-    
-    if (highlights.length > 0) {
-        highlights.slice(0, 8).forEach((item) => {
-            // Handle both object {word, score} and array [word, score] formats
-            const word = item.word || item[0] || "";
-            const score = item.score || item[1] || 0;
-            
-            if (word) {
-                const span = document.createElement("span");
-                span.className = "attention-word";
-                span.textContent = `${word} (${(score * 100).toFixed(0)}%)`;
-                span.style.opacity = 0.4 + score * 0.6;
-                attentionWords.appendChild(span);
-            }
-        });
-    }
+  // Attention highlights - FIXED
+  const attentionWords = document.getElementById("attentionWords");
+  attentionWords.innerHTML = "";
+  const highlights = t.attention_highlights || [];
 
-    // Highlighted phrases in text
-    const snippetEl = document.getElementById("highlightedText");
-    const ctx = document.getElementById("textContext").value || "";
-    const keywords = t.highlighted_phrases || ["breaking", "shocking", "urgent"];
-    
-    if (ctx) {
-        let snippet = ctx.slice(0, 260);
-        keywords.forEach((k) => {
-            const reg = new RegExp("\\b" + k + "\\b", "gi");
-            snippet = snippet.replace(reg, (m) => `<mark>${m}</mark>`);
-        });
-        snippetEl.innerHTML = snippet + (ctx.length > 260 ? "…" : "");
-    }
+  if (highlights.length > 0) {
+    highlights.slice(0, 8).forEach((item) => {
+      // Handle both object {word, score} and array [word, score] formats
+      const word = item.word || item[0] || "";
+      const score = item.score || item[1] || 0;
+
+      if (word) {
+        const span = document.createElement("span");
+        span.className = "attention-word";
+        span.textContent = `${word} (${(score * 100).toFixed(0)}%)`;
+        span.style.opacity = 0.4 + score * 0.6;
+        attentionWords.appendChild(span);
+      }
+    });
+  }
+
+  // Highlighted phrases in text
+  const snippetEl = document.getElementById("highlightedText");
+  const ctx = document.getElementById("textContext").value || "";
+  const keywords = t.highlighted_phrases || ["breaking", "shocking", "urgent"];
+
+  if (ctx) {
+    let snippet = ctx.slice(0, 260);
+    keywords.forEach((k) => {
+      const reg = new RegExp("\\b" + k + "\\b", "gi");
+      snippet = snippet.replace(reg, (m) => `<mark>${m}</mark>`);
+    });
+    snippetEl.innerHTML = snippet + (ctx.length > 260 ? "…" : "");
+  }
 }
-
 
 function renderVisual(v) {
   // Handle both old and new data structures
-  const deep = v.deepfake_score || v.deepfake?.probability || 0;
-  const conf = v.confidence || (v.deepfake?.confidence || 0);
+  const deep =
+  v.misinformation_score ??
+  v.deepfake_score ??
+  v.deepfake?.probability ??
+  0;
+  const conf = v.confidence || v.deepfake?.confidence || 0;
   const verdict = v.verdict || v.deepfake?.verdict || "N/A";
   const artifacts = v.artifacts || v.deepfake?.artifacts || [];
 
@@ -549,7 +572,7 @@ function renderVisual(v) {
   const list = document.getElementById("artifactsList");
   if (list) {
     list.innerHTML = "";
-    
+
     if (!artifacts || artifacts.length === 0) {
       list.innerHTML = `<span class="artifact-tag">No manipulation artifacts detected.</span>`;
     } else {
