@@ -77,6 +77,37 @@ def health_check():
         'agents': detector.agent_status if detector else {}
     }), 200
 
+@app.route('/health', methods=['GET'])
+def health_simple():
+    """
+    Frontend health endpoint for script.js (GET /health).
+    Returns device + feature flags.
+    """
+    # Basic device info (you can refine if you expose Config.DEVICE)
+    device = "cpu"
+    try:
+        # If your ZeroShotDeepfakeDetectionSystem exposes a device attribute
+        if hasattr(detector, "device"):
+            device = str(detector.device)
+    except Exception:
+        pass
+
+    # Feature flags expected by script.js
+    features = {
+        "provenance": True,    # set False if not implemented yet
+        "deepfake": True,
+        "cot": True,           # Chain-of-Thought reasoning
+        "multilingual": True,
+    }
+
+    status = "healthy" if detector is not None else "unhealthy"
+
+    return jsonify({
+        "status": status,
+        "device": device,
+        "features": features,
+    }), 200 if detector is not None else 503
+
 
 @app.route('/api/detect', methods=['POST'])
 def detect():
@@ -246,6 +277,166 @@ def detect_image_only():
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@app.route('/analyze', methods=['POST'])
+def analyze_frontend():
+    """
+    Frontend analysis endpoint for script.js (POST /analyze).
+    Accepts:
+      - file: image/audio/video file
+      - text: optional text context
+      - language: optional language code
+    Returns a dashboard-friendly JSON structure.
+    """
+    if detector is None:
+        return jsonify({
+            "error": "Detection system not initialized",
+            "status": "error"
+        }), 503
+
+    try:
+        text = request.form.get("text", "")
+        language = request.form.get("language", "en")
+
+        file = request.files.get("file")
+        image_path = None
+        audio_path = None
+        video_path = None
+        uploaded_files = []
+
+        if file:
+            filename = secure_filename(file.filename)
+            ext = filename.rsplit(".", 1)[-1].lower()
+            save_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+            file.save(save_path)
+            uploaded_files.append(save_path)
+
+            # Map to a modality based on extension
+            if ext in app.config["ALLOWED_EXTENSIONS"]["image"]:
+                image_path = save_path
+            elif ext in app.config["ALLOWED_EXTENSIONS"]["audio"]:
+                audio_path = save_path
+            elif ext in app.config["ALLOWED_EXTENSIONS"]["video"]:
+                video_path = save_path
+
+        if not any([text, image_path, audio_path, video_path]):
+            return jsonify({
+                "error": "No valid input provided",
+                "status": "error"
+            }), 400
+
+        # Run core detector (detailed)
+        result = detector.detect(
+            text=text or None,
+            image_path=image_path,
+            audio_path=audio_path,
+            video_path=video_path,
+            return_detailed=True
+        )
+
+        # Cleanup temp files
+        for p in uploaded_files:
+            try:
+                if os.path.exists(p):
+                    os.remove(p)
+            except Exception:
+                pass
+
+        # Map core result into dashboard structure
+        fake_prob = float(result.get("fake_probability", 0.5))
+        risk_level = result.get("risk_level", "MEDIUM")
+        confidence = float(result.get("confidence", 0.0))
+
+        # Convert fake probability into an "overall risk score" (0–100)
+        overall_risk_score = round(fake_prob * 100.0, 1)
+
+        # Build visual block
+        visual_block = {
+            "deepfake_score": round(fake_prob * 100.0, 1),
+            "confidence": confidence,
+            "verdict": result.get("agent_verdicts", {}).get("visual", result.get("verdict", "UNCERTAIN")),
+            "artifacts": result.get("visual_artifacts", []),
+        }
+
+        # Simple textual block (you can expand later)
+        textual_block = {
+            "credibility_score": 100.0 - overall_risk_score,
+            "sensationalism_index": result.get("sensationalism", 5.0),
+            "language_detected": language,
+        }
+
+        # Simple source block using web agent score (if present)
+        web_score = result.get("agent_scores", {}).get("web", 0.5)
+        source_block = {
+            "trust_score": round((1.0 - web_score) * 100.0, 1),
+            "links": result.get("web_links", []),
+        }
+
+        # Provenance placeholder
+        provenance_block = {
+            "risk_score": 0.0,
+            "details": []
+        }
+
+        # Reasoning / CoT
+        reasoning_block = {
+            "cot_summary": result.get("explanation", "No reasoning available yet.")
+        }
+
+        # Evidence chain based on agent scores
+        agent_scores = result.get("agent_scores", {})
+        evidence_chain = []
+        if "visual" in agent_scores:
+            evidence_chain.append({
+                "type": "visual",
+                "score": float(agent_scores["visual"]) * 100.0,
+                "weight": 0.35,
+                "reason": f"Visual agent verdict: {result.get('agent_verdicts', {}).get('visual', 'N/A')}"
+            })
+        if "consistency" in agent_scores:
+            evidence_chain.append({
+                "type": "textual",  # or "consistency" if you prefer
+                "score": float(agent_scores["consistency"]) * 100.0,
+                "weight": 0.30,
+                "reason": f"Consistency agent verdict: {result.get('agent_verdicts', {}).get('consistency', 'N/A')}"
+            })
+        if "web" in agent_scores:
+            evidence_chain.append({
+                "type": "source",
+                "score": float(agent_scores["web"]) * 100.0,
+                "weight": 0.25,
+                "reason": f"Web agent verdict: {result.get('agent_verdicts', {}).get('web', 'N/A')}"
+            })
+
+        recommendation = "LOW RISK: Likely authentic content"
+        if risk_level.upper() == "HIGH" or overall_risk_score >= 65:
+            recommendation = "HIGH RISK: Flag for manual review"
+        elif risk_level.upper() == "MEDIUM":
+            recommendation = "MEDIUM RISK: Needs further verification"
+
+        response = {
+            "overall_risk_score": overall_risk_score,
+            "verdict": result.get("verdict", "UNCERTAIN"),
+            "status": "success",
+            "deepfake_probability": visual_block["deepfake_score"],
+            "detected_language": language,
+            "visual": visual_block,
+            "textual": textual_block,
+            "source": source_block,
+            "provenance": provenance_block,
+            "reasoning": reasoning_block,
+            "evidence_chain": evidence_chain,
+            "recommendation": recommendation,
+        }
+
+        return jsonify(response), 200
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({
+            "error": f"Analysis failed: {str(e)}",
+            "status": "error"
+        }), 500
 
 
 @app.errorhandler(413)
