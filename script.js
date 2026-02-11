@@ -406,6 +406,11 @@ async function analyzeContent() {
 
 // === RENDERING ===
 function renderAll(data) {
+  console.log("=== RENDERING DASHBOARD ===");
+  console.log("Full response data:", data);
+  console.log("Textual data:", data.textual);
+  console.log("Visual data:", data.visual);
+  
   renderOverview(data);
   renderTextual(data.textual || {});
   renderVisual(data.visual || {});
@@ -413,6 +418,8 @@ function renderAll(data) {
   renderProvenance(data.provenance || {});
   renderReasoning(data.reasoning || {});
   renderEvidence(data.evidence_chain || []);
+  
+  console.log("=== RENDERING COMPLETE ===");
 }
 
 function renderOverview(data) {
@@ -486,9 +493,15 @@ function renderOverview(data) {
 }
 
 function renderTextual(t) {
-  const cred = t.credibility_score || 0;
-  const sens = t.sensationalism_index || 0;
+  // UPDATED: Handle enhanced text detector output with field mapping
+  console.log("Text result received:", t);  // Debug logging
+  
+  // Get scores - backend now provides both old and new field names for compatibility
+  const misinfoScore = t.misinformation_score || 0;
+  const cred = t.credibility_score || (100 - misinfoScore);  // Backend maps this
+  const sens = t.sensationalism_index || ((misinfoScore / 100) * 10);  // Backend maps this
 
+  // Update bars
   updateBar("credibilityBar", "credibilityScore", cred, "%");
   updateBar(
     "sensationalismBar",
@@ -503,16 +516,18 @@ function renderTextual(t) {
   const lang = t.language_detected || "en";
   langBadge.textContent = `${getLangName(lang)} (${lang})`;
 
-  // Attention highlights - FIXED
+  // Attention highlights - Backend provides mapped data
   const attentionWords = document.getElementById("attentionWords");
   attentionWords.innerHTML = "";
   const highlights = t.attention_highlights || [];
 
+  console.log("Attention highlights:", highlights);  // Debug logging
+
   if (highlights.length > 0) {
-    highlights.slice(0, 8).forEach((item) => {
+    highlights.forEach((item) => {
       // Handle both object {word, score} and array [word, score] formats
       const word = item.word || item[0] || "";
-      const score = item.score || item[1] || 0;
+      const score = item.score || item[1] || 0.5;
 
       if (word) {
         const span = document.createElement("span");
@@ -522,12 +537,21 @@ function renderTextual(t) {
         attentionWords.appendChild(span);
       }
     });
+  } else {
+    // Fallback: Show verdict and confidence
+    const verdict = t.verdict || 'UNCERTAIN';
+    const conf = t.confidence || 0;
+    const span = document.createElement("span");
+    span.className = "attention-word";
+    span.textContent = `${verdict} (${(conf * 100).toFixed(0)}%)`;
+    span.style.opacity = 0.7;
+    attentionWords.appendChild(span);
   }
 
   // Highlighted phrases in text
   const snippetEl = document.getElementById("highlightedText");
   const ctx = document.getElementById("textContext").value || "";
-  const keywords = t.highlighted_phrases || ["breaking", "shocking", "urgent"];
+  const keywords = t.highlighted_phrases || ["breaking", "shocking", "urgent", "secret", "deal"];
 
   if (ctx) {
     let snippet = ctx.slice(0, 260);
@@ -536,6 +560,16 @@ function renderTextual(t) {
       snippet = snippet.replace(reg, (m) => `<mark>${m}</mark>`);
     });
     snippetEl.innerHTML = snippet + (ctx.length > 260 ? "…" : "");
+  } else {
+    // If no context, show the reasoning
+    if (t.reasoning) {
+      snippetEl.innerHTML = `<em>${t.reasoning}</em>`;
+    }
+  }
+  
+  // Log evidence for debugging
+  if (t.evidence) {
+    console.log('Text Analysis Evidence:', t.evidence);
   }
 }
 
